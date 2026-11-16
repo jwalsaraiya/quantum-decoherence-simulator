@@ -4,15 +4,19 @@
 
 ### Real-Time 3D Bloch Sphere & Quantum State Visualizer
 
+[![Live Simulation](https://img.shields.io/badge/Live_Simulation-vercel.app-10B981?style=for-the-badge&logo=vercel&logoColor=white)](https://quantum-decoherence-simulator-jwalsaraiya.vercel.app/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128+-000000?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11.0-0055FF?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
 <p align="center">
   <b>Explore quantum mechanics in three dimensions.</b><br />
   A GPU-accelerated simulation modeling quantum superposition, phase damping, and thermal decoherence on the Bloch sphere.
+</p>
+
+<p align="center">
+  🔗 <b>Live 3D Simulation:</b> <a href="https://quantum-decoherence-simulator-jwalsaraiya.vercel.app/"><b>quantum-decoherence-simulator-jwalsaraiya.vercel.app</b></a>
 </p>
 
 <p align="center">
@@ -91,7 +95,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in any modern WebGL2-compatible browser.
+Open `http://localhost:5173` in any modern WebGL2-compatible browser, or explore the live deployment at [quantum-decoherence-simulator-jwalsaraiya.vercel.app](https://quantum-decoherence-simulator-jwalsaraiya.vercel.app/).
 
 ---
 
