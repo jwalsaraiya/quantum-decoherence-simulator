@@ -590,7 +590,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={label0Ref}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-slate-900 bg-white/95 px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
           |0⟩
         </span>
       </div>
@@ -599,7 +599,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={label1Ref}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-slate-900 bg-white/95 px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
           |1⟩
         </span>
       </div>
@@ -609,7 +609,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelPlusRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50/95 px-2.5 py-0.5 rounded-md shadow-xs border border-blue-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md shadow-xs border border-blue-200">
           |+⟩
         </span>
       </div>
@@ -618,7 +618,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelMinusRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-semibold text-slate-700 bg-white/90 px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
           |−⟩
         </span>
       </div>
@@ -628,7 +628,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelPlusIRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50/95 px-2.5 py-0.5 rounded-md shadow-xs border border-indigo-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md shadow-xs border border-indigo-200">
           |+i⟩
         </span>
       </div>
@@ -637,7 +637,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelMinusIRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-semibold text-slate-700 bg-white/90 px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200 backdrop-blur-xs">
+        <span className="font-mono text-xs font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
           |−i⟩
         </span>
       </div>
@@ -650,7 +650,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
           className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border shadow-xs transition-all cursor-pointer ${
             autoRotate
               ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-              : 'bg-white/95 text-slate-700 border-slate-200 hover:bg-white hover:text-slate-900'
+              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
           {autoRotate ? (
@@ -664,7 +664,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         <button
           type="button"
           onClick={resetRotation}
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white/95 hover:bg-white hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs transition-all cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs transition-all cursor-pointer"
         >
           <RotateCcw size={13} className="text-slate-500" />
           <span>Reset View</span>

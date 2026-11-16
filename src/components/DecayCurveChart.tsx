@@ -367,7 +367,7 @@ export default function DecayCurveChart({ curve, progress }: Props) {
       {/* Floating Hover Tooltip */}
       {hoveredPoint && (
         <div
-          className="absolute pointer-events-none z-20 bg-slate-900/95 text-white rounded-lg shadow-xl px-3 py-1.5 text-xs font-mono border border-slate-700/80 transition-all duration-75"
+          className="absolute pointer-events-none z-20 bg-slate-900 text-white rounded-lg shadow-xl px-3 py-1.5 text-xs font-mono border border-slate-700 transition-all duration-75"
           style={{
             left: `${((hoveredPoint.svgX - PADDING.left) / plotW) * 78 + 12}%`,
             top: `${(hoveredPoint.svgY / VIEW_H) * 80 + 5}%`,

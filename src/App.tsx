@@ -580,7 +580,7 @@ export default function App() {
                         <p className="text-slate-300 text-[10px] leading-relaxed">
                           Phase coherence time T₂ can never exceed 2× energy relaxation time T₁. Spontaneous energy decay |1⟩ → |0⟩ intrinsically destroys quantum superposition.
                         </p>
-                        <div className="font-mono text-[10px] bg-slate-800/90 text-emerald-200 px-2 py-1 rounded border border-slate-700">
+                        <div className="font-mono text-[10px] bg-slate-800 text-emerald-200 px-2 py-1 rounded border border-slate-700">
                           1/T₂ = 1/(2T₁) + 1/T_φ
                         </div>
                       </div>
@@ -606,10 +606,10 @@ export default function App() {
                             <p className="text-slate-300 text-[10px] leading-relaxed">
                               Longitudinal decay (|1⟩ → |0⟩): Spontaneous energy loss ΔE = hf into the cold environment.
                             </p>
-                            <div className="font-mono text-[10px] bg-slate-800/90 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                            <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
                               P₁(t) = P₁(0) · e^(-t / T₁)
                             </div>
-                            <div className="text-[9px] text-amber-200/90 bg-amber-950/40 p-1.5 rounded border border-amber-800/50 leading-tight">
+                            <div className="text-[9px] text-amber-200 bg-amber-950 p-1.5 rounded border border-amber-800 leading-tight">
                               <strong>Why %?</strong> Represents normalized damping probability γ = 1 − e^(-t/T₁): 0% = no decay, 63% = t = T₁, 100% = complete relaxation to |0⟩.
                             </div>
                           </div>
@@ -655,10 +655,10 @@ export default function App() {
                             <p className="text-slate-300 text-[10px] leading-relaxed">
                               Transverse coherence loss: Field fluctuations scramble relative phase without energy loss.
                             </p>
-                            <div className="font-mono text-[10px] bg-slate-800/90 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                            <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
                               ρ₀₁(t) = ρ₀₁(0) · e^(-t / T₂)
                             </div>
-                            <div className="text-[9px] text-amber-200/90 bg-amber-950/40 p-1.5 rounded border border-amber-800/50 leading-tight">
+                            <div className="text-[9px] text-amber-200 bg-amber-950 p-1.5 rounded border border-amber-800 leading-tight">
                               <strong>Why %?</strong> Represents phase scrambling severity λ = 1 − e^(-t/T₂): 0% = full phase coherence, 100% = completely randomized phase.
                             </div>
                           </div>
@@ -737,7 +737,7 @@ export default function App() {
                                 key={p.id}
                                 onClick={() => handleSelectPreset(p)}
                                 className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between group ${
-                                  selectedPresetLabel === p.label ? 'bg-blue-50/70 border border-blue-200' : ''
+                                  selectedPresetLabel === p.label ? 'bg-blue-100 border border-blue-200' : ''
                                 }`}
                               >
                                 <span className="font-bold text-slate-800 text-[11px] truncate pr-2">
@@ -770,7 +770,7 @@ export default function App() {
                                 key={p.id}
                                 onClick={() => handleSelectPreset(p)}
                                 className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between group ${
-                                  selectedPresetLabel === p.label ? 'bg-blue-50/70 border border-blue-200' : ''
+                                  selectedPresetLabel === p.label ? 'bg-blue-100 border border-blue-200' : ''
                                 }`}
                               >
                                 <span className="font-bold text-slate-800 text-[11px] truncate pr-2">
@@ -818,7 +818,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={startSim}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] text-xs"
+                  className="flex-1 btn-quantum-action text-white font-semibold py-2 px-4 rounded-lg shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] text-xs"
                 >
                   {playing ? (
                     <>
@@ -870,7 +870,7 @@ export default function App() {
                         <p className="text-slate-300 text-[10px] leading-relaxed">
                           Overlap probability between ideal pure state |ψ₀⟩ and decohered mixed state ρ(t).
                         </p>
-                        <div className="font-mono text-[10px] bg-slate-800/90 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                        <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
                           F = ⟨ψ₀|ρ|ψ₀⟩ = Tr(ρ₀ · ρ)
                         </div>
                         <p className="text-slate-400 text-[9px]">

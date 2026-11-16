@@ -196,7 +196,7 @@ export default function SmartInfoTooltip({
                   width,
                   zIndex: 99999,
                 }}
-                className="bg-slate-900/95 text-white p-2.5 rounded-xl shadow-2xl border border-slate-700/90 text-xs font-sans leading-relaxed backdrop-blur-xs select-none"
+                className="bg-slate-900 text-white p-2.5 rounded-xl shadow-2xl border border-slate-700 text-xs font-sans leading-relaxed select-none"
               >
                 {/* Pointer Arrow */}
                 <div
