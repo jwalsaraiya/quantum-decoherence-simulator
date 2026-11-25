@@ -18,9 +18,6 @@ import {
   Users,
   ChevronDown,
   Activity,
-  Sliders,
-  Compass,
-  LineChart,
   Zap,
   ShieldCheck,
   Cpu,
@@ -32,6 +29,7 @@ import SmartInfoTooltip from './components/SmartInfoTooltip'
 import {
   computeQuantumState,
   buildDecayCurve,
+  hasActiveNoise,
   PRESETS,
   type NoiseParams,
   type PresetKey,
@@ -62,8 +60,11 @@ const expandVariant: Variants = {
 
 // Active realistic defaults
 const ACTIVE_DEFAULTS: NoiseParams = {
-  t1: 0.35, // 35% Energy Relaxation
-  t2: 0.55, // 55% Phase Dephasing
+  t1: 0.35, // 35% Energy Relaxation Rate (1/T₁)
+  t2: 0.55, // 55% Phase Dephasing Rate (1/T₂)
+  px: 0, // 0% Bit-Flip Noise (pₓ)
+  pz: 0, // 0% Phase-Flip Noise (p_z)
+  p: 0, // 0% Depolarizing Noise (p)
 }
 
 const SIMULATION_DURATION = 3000 // ms
@@ -78,78 +79,168 @@ const CONTRIBUTORS = [
 interface SimulationPresetOption {
   id: string
   label: string
-  category: 'Regimes' | 'Hardware'
+  category: 'Continuous' | 'Pauli' | 'Hardware'
   t1: number
   t2: number
+  px: number
+  pz: number
+  p: number
   detail: string
 }
 
 const ALL_SIMULATION_PRESETS: SimulationPresetOption[] = [
   {
+    id: 'ideal',
+    label: 'Ideal Noise-Free Qubit (All 0%)',
+    category: 'Continuous',
+    t1: 0.0,
+    t2: 0.0,
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Zero decoherence across all channels; persistent pure unitary quantum state.',
+  },
+  {
     id: 'standard',
-    label: 'Standard Noise (T₁: 35%, T₂: 55%)',
-    category: 'Regimes',
+    label: 'Standard T₁/T₂ Decoherence (T₁: 35%, T₂: 55%)',
+    category: 'Continuous',
     t1: 0.35,
     t2: 0.55,
-    detail: 'Balanced energy dissipation & transverse dephasing.',
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Balanced Module 2 energy dissipation (1/T₁) & transverse dephasing (1/T₂), satisfying T₂ ≤ 2T₁.',
   },
   {
     id: 'pure_t2',
     label: 'Pure T₂ Dephasing (T₁: 0%, T₂: 65%)',
-    category: 'Regimes',
+    category: 'Continuous',
     t1: 0.0,
     t2: 0.65,
-    detail: 'Zero energy loss; scrambles relative phase in superpositions without affecting pure Z eigenstates.',
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Zero energy loss; scrambles relative phase in superpositions without affecting computational eigenstates.',
   },
   {
-    id: 'pure_t1',
-    label: 'T₁ Energy Decay (T₁: 65%, T₂: 20%)',
-    category: 'Regimes',
+    id: 't1_dominated',
+    label: 'T₁-Dominated Decay (T₁: 65%, T₂: 35%)',
+    category: 'Continuous',
     t1: 0.65,
-    t2: 0.2,
-    detail: '|1⟩ → |0⟩ spontaneous decay dominates; dissipates energy ΔE = hf into environment.',
+    t2: 0.35,
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: '|1⟩ → |0⟩ spontaneous energy decay near the physical T₂ ≤ 2T₁ limit (35% ≥ 0.5 × 65%).',
   },
   {
-    id: 'ideal',
-    label: 'Ideal State (0% Noise / Pure Coherent)',
-    category: 'Regimes',
+    id: 'bit_flip',
+    label: 'Bit-Flip Channel (pₓ: 25%)',
+    category: 'Pauli',
     t1: 0.0,
     t2: 0.0,
-    detail: 'Zero decoherence; persistent unitary quantum coherence.',
+    px: 0.25,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Module 3 Pauli-X noise channel: flips |0⟩ ↔ |1⟩ with probability 25%, scaling r_y & r_z by (1 − 2pₓ).',
   },
   {
-    id: 'transmon',
-    label: 'Superconducting Transmon',
+    id: 'phase_flip',
+    label: 'Phase-Flip Channel (p_z: 25%)',
+    category: 'Pauli',
+    t1: 0.0,
+    t2: 0.0,
+    px: 0.0,
+    pz: 0.25,
+    p: 0.0,
+    detail: 'Module 3 Pauli-Z noise channel: inverts relative phase with 25% probability, scaling r_x & r_y by (1 − 2p_z).',
+  },
+  {
+    id: 'depolarizing',
+    label: 'Depolarizing Channel (p: 20%)',
+    category: 'Pauli',
+    t1: 0.0,
+    t2: 0.0,
+    px: 0.0,
+    pz: 0.0,
+    p: 0.2,
+    detail: 'Module 3 isotropic noise: uniformly contracts Bloch vector (r_x, r_y, r_z) toward origin by 1 − (4/3)p.',
+  },
+  {
+    id: 'combined_noise',
+    label: 'Combined Noise (T₁: 25%, T₂: 40%, pₓ: 10%, p: 10%)',
+    category: 'Pauli',
+    t1: 0.25,
+    t2: 0.4,
+    px: 0.1,
+    pz: 0.0,
+    p: 0.1,
+    detail: 'Realistic combined regime: simultaneous Lindblad T₁/T₂ decay with discrete Pauli bit-flip & depolarizing gate errors.',
+  },
+  {
+    id: 'superconducting',
+    label: 'Superconducting Qubit (T₁: 60%, T₂: 75%)',
     category: 'Hardware',
-    t1: 0.45,
-    t2: 0.65,
-    detail: 'T₁ ~ 100 μs, T₂ ~ 80 μs · Josephson junction LC circuit (IBM / Google), limited by dielectric loss & flux noise.',
+    t1: 0.6,
+    t2: 0.75,
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Transmon superconducting circuit (IBM / Google); T₁ ~ 100 μs, T₂ ~ 80 μs, limited by dielectric & flux noise.',
   },
   {
     id: 'trapped_ion',
-    label: 'Trapped Ion',
+    label: 'Trapped Ion (T₁: 5%, T₂: 15%)',
     category: 'Hardware',
     t1: 0.05,
     t2: 0.15,
-    detail: 'T₁ > 10 s, T₂ ~ 1.5 s · Atomic ions in RF Paul trap (IonQ / Quantinuum) with Raman laser transitions.',
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Atomic ions in RF Paul trap (IonQ / Quantinuum); T₁ > 10 s, T₂ ~ 1.5 s, ultra-low spontaneous relaxation.',
   },
   {
     id: 'nv_center',
-    label: 'NV Center in Diamond',
+    label: 'NV Center in Diamond (T₁: 25%, T₂: 60%)',
     category: 'Hardware',
     t1: 0.25,
     t2: 0.6,
-    detail: 'T₁ ~ 1 ms, T₂ ~ 0.5 ms · Solid-state spin defect, room temperature capability.',
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Solid-state spin defect with room-temperature optical readout; dephasing driven by ¹³C nuclear spin bath.',
   },
   {
     id: 'photonic',
-    label: 'Photonic Qubit',
+    label: 'Photonic Qubit (T₁: 0%, T₂: 12%)',
     category: 'Hardware',
     t1: 0.0,
     t2: 0.12,
-    detail: 'T₁ = ∞ (No spontaneous energy decay) · Limited by optical waveguide loss & phase drift (PsiQuantum / Xanadu).',
+    px: 0.0,
+    pz: 0.0,
+    p: 0.0,
+    detail: 'Flying photon qubit (PsiQuantum / Xanadu); T₁ = ∞ (zero spontaneous energy decay), minor waveguide phase drift.',
   },
 ]
+
+function renderPresetLabel(text: string) {
+  if (!text.includes('p_z')) return text
+  const parts = text.split('p_z')
+  return (
+    <>
+      {parts.map((part, idx) => (
+        <span key={idx}>
+          {part}
+          {idx < parts.length - 1 && (
+            <>
+              p<sub>z</sub>
+            </>
+          )}
+        </span>
+      ))}
+    </>
+  )
+}
 
 export default function App() {
   // Qubit initial state (defaults to |+⟩: θ = 90°, φ = 0° for active decoherence demonstration)
@@ -157,12 +248,12 @@ export default function App() {
   const [theta, setTheta] = useState(Math.PI / 2)
   const [phi, setPhi] = useState(0)
 
-  // Relaxation channels (T1 and T2 relaxation)
+  // Combined Continuous (T1, T2) + Discrete Pauli (px, pz, p) channels
   const [noise, setNoise] = useState<NoiseParams>(ACTIVE_DEFAULTS)
 
   // Selected preset label for drop-up display
   const [selectedPresetLabel, setSelectedPresetLabel] = useState<string>(
-    'Standard Noise (T₁: 35%, T₂: 55%)',
+    'Standard T₁/T₂ Decoherence (T₁: 35%, T₂: 55%)',
   )
   const [showPresetMenu, setShowPresetMenu] = useState(false)
 
@@ -235,28 +326,31 @@ export default function App() {
     rafRef.current = requestAnimationFrame(step)
   }, [playing, progress, stopSim])
 
-  // Reset button takes all sliders to 0 and state to |+⟩
+  // Reset button takes all 5 noise sliders to 0 and state to |+⟩
   const handleReset = useCallback(() => {
     stopSim()
     setPresetKey('plus')
     setTheta(Math.PI / 2)
     setPhi(0)
-    setNoise({ t1: 0, t2: 0 })
-    setSelectedPresetLabel('Ideal State (0% Noise / Pure Coherent)')
+    setNoise({ t1: 0, t2: 0, px: 0, pz: 0, p: 0 })
+    setSelectedPresetLabel('Ideal Noise-Free Qubit (All 0%)')
     setProgress(1)
   }, [stopSim])
 
-  // Helper to enforce physical bound T2 <= 2T1 (when T1 is small)
+  // Helper to enforce physical bound T2 <= 2T1 -> Rate (1/T2) >= 0.5 * Rate (1/T1)
   const enforceBound = useCallback(() => {
-    if (noise.t2 > 2 * noise.t1 && noise.t1 > 0) {
-      setNoise((prev) => ({ ...prev, t2: Math.min(1, 2 * prev.t1) }))
+    const t1Pct = Math.round(noise.t1 * 100)
+    const minT2Pct = Math.ceil(0.5 * t1Pct)
+    const t2Pct = Math.round(noise.t2 * 100)
+    if (t2Pct < minT2Pct) {
+      setNoise((prev) => ({ ...prev, t2: minT2Pct / 100 }))
       setSelectedPresetLabel('Custom Configuration')
     }
   }, [noise.t1, noise.t2])
 
-  // Preset Selection Handler
+  // Preset Selection Handler (auto-sets all 5 channels simultaneously)
   const handleSelectPreset = (p: SimulationPresetOption) => {
-    setNoise({ t1: p.t1, t2: p.t2 })
+    setNoise({ t1: p.t1, t2: p.t2, px: p.px, pz: p.pz, p: p.p })
     setSelectedPresetLabel(p.label)
     setShowPresetMenu(false)
   }
@@ -283,73 +377,84 @@ export default function App() {
   }, [showContrib])
 
   const getFidelityStatus = (f: number) => {
-    if (f >= 0.99) return { label: 'Pure Coherent', color: 'text-blue-700 bg-blue-50 border-blue-200' }
-    if (f >= 0.7) return { label: 'High Coherence', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' }
-    if (f >= 0.35) return { label: 'Decohered', color: 'text-amber-700 bg-amber-50 border-amber-200' }
-    return { label: 'Orthogonal State', color: 'text-rose-700 bg-rose-50 border-rose-200' }
+    if (f >= 0.99) return { label: 'Pure Coherent', color: 'text-[#1D4ED8] bg-[#EFF6FF] border-[#2563EB]', dot: 'bg-[#2563EB]' }
+    if (f >= 0.7) return { label: 'High Coherence', color: 'text-[#11151C] bg-[#D4F74A] border-[#11151C]', dot: 'bg-[#11151C]' }
+    if (f >= 0.35) return { label: 'Decohered', color: 'text-[#92400E] bg-[#FEF3C7] border-[#D97706]', dot: 'bg-[#D97706]' }
+    return { label: 'Orthogonal', color: 'text-[#B91C1C] bg-[#FEF2F2] border-[#DC2626]', dot: 'bg-[#DC2626]' }
   }
 
   const fidStatus = getFidelityStatus(qState.fidelity)
 
   return (
-    // Single-Screen Viewport Lock
-    <div className="h-screen w-screen overflow-hidden flex flex-col bg-[#F8FAFC] text-[#0F172A] select-none font-sans">
-      {/* ── TOP HEADER BAR (Clean, Bold, Zero Clutter) ────────────────────── */}
-      <header className="shrink-0 h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between relative z-30 shadow-xs">
-        {/* Left Branding with Prominent Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs">
-            <Activity size={18} />
+    // Responsive Layout: Single-Screen Lock on Desktop (lg:), Smooth Scrollable Stack on Tablet/Mobile
+    <div className="min-h-screen lg:h-screen w-full overflow-x-hidden lg:overflow-hidden flex flex-col bg-[#F3EFE6] text-[#11151C] select-none font-sans">
+      {/* ── TOP HEADER BAR ────────────────────────────────────────────────── */}
+      <header className="shrink-0 h-12 bg-[#11151C] border-b-2 border-[#11151C] text-[#F3EFE6] px-4 sm:px-6 flex items-center justify-between gap-3 relative z-30">
+        {/* Left: Compact Circular Bloch Seal + Clean Small Title */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className="w-7 h-7 rounded-full bg-[#2563EB] border border-[#D4F74A] flex items-center justify-center shrink-0"
+            aria-hidden="true"
+          >
+            <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="6.5" stroke="#BFDBFE" strokeWidth="1.25" />
+              <ellipse cx="9" cy="9" rx="6.5" ry="2.2" stroke="#D4F74A" strokeWidth="1" strokeDasharray="1.8 1.5" />
+              <line x1="9" y1="9" x2="13.8" y2="4.2" stroke="#FFFFFF" strokeWidth="1.9" strokeLinecap="round" />
+              <circle cx="9" cy="9" r="1.4" fill="#FFFFFF" />
+            </svg>
           </div>
-          <div>
-            <h1 className="text-base font-extrabold text-slate-900 tracking-tight uppercase">
-              QUANTUM DECOHERENCE &amp; NOISE SIMULATOR
-            </h1>
-          </div>
+          <h1 className="text-xs sm:text-sm font-bold text-[#FFFFFF] tracking-tight truncate">
+            Quantum Decoherence and Noise Simulator
+          </h1>
         </div>
 
-        {/* Right: Team Dropdown (BQT SLA IT-2 Roll No. 13 to 16) */}
-        <div className="relative">
+        {/* Right: Team Roster Dropdown (BQT SLA IT-2 Roll No. 13 to 16) */}
+        <div className="relative shrink-0">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation()
               setShowContrib((s) => !s)
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-white hover:border-slate-400 transition-colors text-xs text-slate-700 font-medium cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 rounded-md border border-[#334155] bg-[#1E2430] hover:bg-[#273040] transition-colors text-xs text-[#F3EFE6] cursor-pointer active:scale-[0.97]"
           >
-            <Users size={14} className="text-blue-600" />
-            <span className="font-semibold text-slate-800">BQT SLA IT-2</span>
-            <span className="text-slate-500 text-[11px]">(Roll No. 13 to 16)</span>
+            <Users size={13} className="text-[#D4F74A] shrink-0" />
+            <span className="font-semibold text-[#FFFFFF]">BQT SLA IT-2</span>
+            <span className="hidden sm:inline font-mono text-[#CBD5E1] text-[11px]">
+              (Roll No. 13 to 16)
+            </span>
             <ChevronDown
               size={13}
-              className={`transition-transform duration-200 text-slate-400 ${
+              className={`transition-transform duration-150 text-[#CBD5E1] ${
                 showContrib ? 'rotate-180' : ''
               }`}
             />
           </button>
 
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {showContrib && (
               <motion.div
-                initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                initial={{ opacity: 0, y: 4, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 p-3 z-50"
+                exit={{ opacity: 0, y: 3, scale: 0.98 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-[3px_3px_0px_#11151C] border-2 border-[#11151C] p-2.5 z-50 text-[#11151C]"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2 flex justify-between items-center">
+                <div className="text-[11px] font-bold text-[#11151C] uppercase tracking-wider mb-1.5 px-2 flex justify-between items-center border-b border-[#E5E0D5] pb-1.5">
                   <span>Project Contributors</span>
-                  <span className="text-blue-600 font-mono text-[10px]">IT-2</span>
+                  <span className="font-mono bg-[#D4F74A] text-[#11151C] border border-[#11151C] px-1.5 py-0.5 rounded text-[10px]">
+                    IT-2
+                  </span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {CONTRIBUTORS.map((c) => (
                     <div
                       key={c.roll}
-                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-xs transition-colors"
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[#F8F5EE] text-xs transition-colors"
                     >
-                      <span className="font-semibold text-slate-800">{c.name}</span>
-                      <span className="font-mono text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-100 text-[11px]">
+                      <span className="font-medium text-[#11151C]">{c.name}</span>
+                      <span className="font-mono text-[#1D4ED8] bg-[#EFF6FF] px-2 py-0.5 rounded border border-[#93C5FD] text-[11px] tabular-nums">
                         Roll {c.roll}
                       </span>
                     </div>
@@ -361,57 +466,91 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── MAIN CONTENT GRID (5 Cols Left, 7 Cols Right) ──────────────────── */}
-      <main className="flex-1 min-h-0 p-3.5 grid grid-cols-12 gap-3.5 overflow-hidden">
-        {/* ── LEFT PANEL: CONTROLS (5 Cols) ────────────────────────────────── */}
-        <div className="col-span-5 flex flex-col gap-3 min-h-0 overflow-y-auto pr-0.5">
+      {/* ── MAIN WORKSPACE GRID (Responsive 1-Col Mobile -> 12-Col Desktop) ──── */}
+      <main className="flex-1 min-h-0 p-3 sm:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:overflow-hidden">
+        {/* ── LEFT PANEL: CONTROLS (5 Cols on Desktop) ──────────────────────── */}
+        <div className="col-span-1 lg:col-span-5 flex flex-col gap-3 min-h-0 lg:overflow-y-auto lg:pr-1 pb-1">
           {/* Card 1: Initial Qubit State |ψ₀⟩ */}
           <motion.div
             variants={cardVariant}
             initial="hidden"
             animate="show"
-            className="bg-white rounded-xl border border-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-3.5 shrink-0"
+            className="poster-card rounded-xl p-3.5 shrink-0"
           >
-            <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                <Compass size={14} className="text-blue-600" />
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <h2 className="text-[13.5px] font-bold text-[#11151C] tracking-tight truncate">
                 Initial Qubit State |ψ₀⟩
               </h2>
+              <span className="font-mono font-semibold text-[#1D4ED8] bg-[#EFF6FF] px-2.5 py-0.5 rounded-md border border-[#11151C] text-[11px] shrink-0">
+                {qState.stateString}
+              </span>
             </div>
 
-            {/* Custom State Option (Positioned ABOVE the 6 Initial States) */}
-            <div className="mb-2">
+            {/* 3x2 State Selector Grid */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              {[
+                { key: 'plus' as const, ket: '|+⟩', sub: 'Superposition' },
+                { key: 'zero' as const, ket: '|0⟩', sub: 'Ground' },
+                { key: 'one' as const, ket: '|1⟩', sub: 'Excited' },
+                { key: 'minus' as const, ket: '|−⟩', sub: 'Phase π' },
+                { key: 'plusI' as const, ket: '|+i⟩', sub: 'Phase +90°' },
+                { key: 'minusI' as const, ket: '|−i⟩', sub: 'Phase −90°' },
+              ].map((st) => {
+                const active = presetKey === st.key
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setPresetKey(st.key)}
+                    className={`px-2 py-2 rounded-lg text-xs transition-all cursor-pointer active:scale-[0.98] ${
+                      active
+                        ? 'bg-[#2563EB] text-white border-[1.5px] border-[#11151C] shadow-[2px_2px_0px_#11151C] font-semibold'
+                        : 'bg-[#F8F5EE] text-[#11151C] border border-[#CBD5E1] hover:bg-[#F3EFE6] hover:border-[#11151C] font-medium'
+                    }`}
+                  >
+                    <span className="font-mono block text-[12.5px] font-semibold">{st.ket}</span>
+                    <span
+                      className={`block text-[10.5px] mt-0.5 ${
+                        active ? 'text-[#EFF6FF]' : 'text-[#475569]'
+                      }`}
+                    >
+                      {st.sub}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Custom Angles Pill Toggle & Expandable Sliders */}
+            <div>
               <button
                 type="button"
-                onClick={() => setPresetKey('custom')}
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer flex items-center justify-between ${
+                onClick={() => setPresetKey(presetKey === 'custom' ? 'plus' : 'custom')}
+                className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-between active:scale-[0.99] ${
                   presetKey === 'custom'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-[#2563EB] text-white border-[1.5px] border-[#11151C] shadow-[2px_2px_0px_#11151C]'
+                    : 'bg-[#F8F5EE] text-[#11151C] border border-[#CBD5E1] hover:border-[#11151C]'
                 }`}
               >
-                <span>|ψ(θ, φ)⟩ Custom Qubit State</span>
-                <span className="text-[10px] font-sans font-normal opacity-80">
-                  {presetKey === 'custom' ? 'Configuring Angles' : 'Click to customize θ & φ'}
+                <span className="font-mono font-semibold text-[11.5px]">|ψ(θ, φ)⟩ Custom Angles</span>
+                <span className={`text-[11px] font-medium ${presetKey === 'custom' ? 'text-[#EFF6FF]' : 'text-[#475569]'}`}>
+                  {presetKey === 'custom' ? 'Configuring θ & φ' : 'Customize θ & φ'}
                 </span>
               </button>
 
-              {/* Custom Angle Sliders (Expands directly underneath Custom State button) */}
-              <AnimatePresence>
+              <AnimatePresence initial={false}>
                 {presetKey === 'custom' && (
                   <motion.div
                     variants={expandVariant}
                     initial="hidden"
                     animate="show"
                     exit="exit"
-                    className="space-y-2.5 pt-2.5 pb-1 border-t border-slate-100 mt-2"
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2.5 pb-0.5 border-t border-[#E5E0D5] mt-2"
                   >
                     <div>
-                      <div className="flex justify-between items-center mb-1 text-xs">
-                        <span className="font-semibold text-slate-700">
-                          Polar Angle θ (0° to 180°)
-                        </span>
-                        <span className="font-mono font-bold text-slate-900">
+                      <div className="flex justify-between items-baseline mb-1.5 text-xs">
+                        <span className="text-[#11151C] font-medium">Polar Angle θ</span>
+                        <span className="font-mono font-semibold text-[#2563EB] tabular-nums">
                           {((theta / Math.PI) * 180).toFixed(0)}°
                         </span>
                       </div>
@@ -424,18 +563,16 @@ export default function App() {
                           setTheta((Number(e.target.value) / 180) * Math.PI)
                         }
                         style={{
-                          background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((theta / Math.PI) * 100)}%, #E2E8F0 ${Math.round((theta / Math.PI) * 100)}%, #E2E8F0 100%)`,
+                          background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((theta / Math.PI) * 100)}%, #DFDBD0 ${Math.round((theta / Math.PI) * 100)}%, #DFDBD0 100%)`,
                         }}
                         className="quantum-slider"
                       />
                     </div>
 
                     <div>
-                      <div className="flex justify-between items-center mb-1 text-xs">
-                        <span className="font-semibold text-slate-700">
-                          Azimuthal Phase φ (0° to 360°)
-                        </span>
-                        <span className="font-mono font-bold text-slate-900">
+                      <div className="flex justify-between items-baseline mb-1.5 text-xs">
+                        <span className="text-[#11151C] font-medium">Azimuthal Phase φ</span>
+                        <span className="font-mono font-semibold text-[#2563EB] tabular-nums">
                           {((phi / (2 * Math.PI)) * 360).toFixed(0)}°
                         </span>
                       </div>
@@ -448,7 +585,7 @@ export default function App() {
                           setPhi((Number(e.target.value) / 360) * 2 * Math.PI)
                         }
                         style={{
-                          background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((phi / (2 * Math.PI)) * 100)}%, #E2E8F0 ${Math.round((phi / (2 * Math.PI)) * 100)}%, #E2E8F0 100%)`,
+                          background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((phi / (2 * Math.PI)) * 100)}%, #DFDBD0 ${Math.round((phi / (2 * Math.PI)) * 100)}%, #DFDBD0 100%)`,
                         }}
                         className="quantum-slider"
                       />
@@ -457,130 +594,40 @@ export default function App() {
                 )}
               </AnimatePresence>
             </div>
-
-            {/* Symmetric 3x2 Grid for 6 Cardinal Quantum States */}
-            <div className="grid grid-cols-3 gap-1.5 mb-2.5">
-              <button
-                type="button"
-                onClick={() => setPresetKey('plus')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'plus'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |+⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Superposition</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPresetKey('zero')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'zero'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |0⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Ground</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPresetKey('one')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'one'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |1⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Excited</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPresetKey('minus')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'minus'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |−⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Phase π</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPresetKey('plusI')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'plusI'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |+i⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Phase +90°</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPresetKey('minusI')}
-                className={`px-2 py-2 rounded-lg text-xs font-bold font-mono transition-all border cursor-pointer ${
-                  presetKey === 'minusI'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                |−i⟩
-                <span className="block text-[9px] font-sans font-normal opacity-80">Phase −90°</span>
-              </button>
-            </div>
-
-            {/* Live Algebraic State Formula */}
-            <div className="px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
-              <span className="font-mono text-slate-600 text-[11px]">
-                |ψ⟩ = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩
-              </span>
-              <span className="font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                {qState.stateString}
-              </span>
-            </div>
           </motion.div>
 
-          {/* Card 2: Decoherence Relaxation Channels */}
+          {/* Card 2: Decoherence Noise Channels (All 5 Sliders Simultaneous) */}
           <motion.div
             variants={cardVariant}
             initial="hidden"
             animate="show"
-            className="flex-1 bg-white rounded-xl border border-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-3.5 flex flex-col justify-between min-h-0 relative"
+            className="flex-auto shrink-0 poster-card rounded-xl p-3.5 flex flex-col justify-between gap-3 relative"
           >
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                  <Sliders size={14} className="text-blue-600" />
+              {/* Card Header + T2 <= 2T1 Bound */}
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="text-[13.5px] font-bold text-[#11151C] tracking-tight">
                   Decoherence Noise Channels
                 </h2>
-                <div className="flex items-center gap-1.5">
+
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={enforceBound}
-                    className="flex items-center gap-1 text-[11px] font-mono text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 px-2 py-0.5 rounded border border-slate-200 transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] font-mono font-semibold text-[#11151C] bg-[#D4F74A] hover:bg-[#C6EA3D] px-2 py-0.5 rounded-md border-[1.5px] border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C] transition-colors cursor-pointer whitespace-nowrap active:scale-[0.97]"
                   >
-                    <ShieldCheck size={13} className="text-emerald-600" />
+                    <ShieldCheck size={12} className="text-[#11151C]" />
                     <span>T₂ ≤ 2T₁ Bound</span>
                   </button>
                   <SmartInfoTooltip
-                    width={260}
+                    width={265}
                     content={
                       <div className="space-y-1">
-                        <div className="font-bold text-emerald-300">Physical Coherence Bound</div>
-                        <p className="text-slate-300 text-[10px] leading-relaxed">
-                          Phase coherence time T₂ can never exceed 2× energy relaxation time T₁. Spontaneous energy decay |1⟩ → |0⟩ intrinsically destroys quantum superposition.
+                        <div className="font-semibold text-[#D4F74A]">Physical Coherence Bound</div>
+                        <p className="text-[#CBD5E1] text-[10px] leading-relaxed">
+                          Phase coherence time T₂ can never exceed 2× energy relaxation time T₁, so Phase Dephasing (1/T₂) is enforced ≥ 0.5 × Energy Relaxation (1/T₁).
                         </p>
-                        <div className="font-mono text-[10px] bg-slate-800 text-emerald-200 px-2 py-1 rounded border border-slate-700">
+                        <div className="font-mono text-[10px] bg-[#1E293B] text-[#D4F74A] px-2 py-1 rounded border border-[#334155]">
                           1/T₂ = 1/(2T₁) + 1/T_φ
                         </div>
                       </div>
@@ -589,36 +636,31 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {/* Channel 1: Energy Relaxation T1 with SmartInfoTooltip */}
-                <div className="relative">
-                  <div className="flex justify-between items-center mb-1 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-800">
-                        Energy Relaxation (T₁)
+              {/* Row 1: Continuous Decay (2 Columns, 0%–100%) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <div className="flex justify-between items-baseline mb-1.5 gap-1">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="font-semibold text-[#11151C] text-xs truncate">
+                        Energy Relaxation (1/T₁)
                       </span>
-                      
                       <SmartInfoTooltip
-                        width={275}
+                        width={265}
                         content={
                           <div className="space-y-1.5">
-                            <div className="font-bold text-blue-300">Energy Relaxation (T₁)</div>
-                            <p className="text-slate-300 text-[10px] leading-relaxed">
+                            <div className="font-semibold text-[#93C5FD]">Energy Relaxation (1/T₁)</div>
+                            <p className="text-[#CBD5E1] text-[10px] leading-relaxed">
                               Longitudinal decay (|1⟩ → |0⟩): Spontaneous energy loss ΔE = hf into the cold environment.
                             </p>
-                            <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                            <div className="font-mono text-[10px] bg-[#1E293B] text-[#BFDBFE] px-2 py-1 rounded border border-[#334155]">
                               P₁(t) = P₁(0) · e^(-t / T₁)
-                            </div>
-                            <div className="text-[9px] text-amber-200 bg-amber-950 p-1.5 rounded border border-amber-800 leading-tight">
-                              <strong>Why %?</strong> Represents normalized damping probability γ = 1 − e^(-t/T₁): 0% = no decay, 63% = t = T₁, 100% = complete relaxation to |0⟩.
                             </div>
                           </div>
                         }
                       />
                     </div>
-
-                    <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                      {(noise.t1 * 100).toFixed(0)}%
+                    <span className="font-mono font-bold text-[#2563EB] text-xs shrink-0 tabular-nums">
+                      {Math.round(noise.t1 * 100)}%
                     </span>
                   </div>
 
@@ -628,46 +670,45 @@ export default function App() {
                     max={100}
                     value={Math.round(noise.t1 * 100)}
                     onChange={(e) => {
-                      const val = Number(e.target.value) / 100
-                      setNoise((prev) => ({ ...prev, t1: val }))
+                      const t1Pct = Number(e.target.value)
+                      const minT2Pct = Math.ceil(0.5 * t1Pct)
+                      setNoise((prev) => ({
+                        ...prev,
+                        t1: t1Pct / 100,
+                        t2: Math.max(prev.t2, minT2Pct / 100),
+                      }))
                       setSelectedPresetLabel('Custom Configuration')
                     }}
                     style={{
-                      background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round(noise.t1 * 100)}%, #E2E8F0 ${Math.round(noise.t1 * 100)}%, #E2E8F0 100%)`,
+                      background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round(noise.t1 * 100)}%, #DFDBD0 ${Math.round(noise.t1 * 100)}%, #DFDBD0 100%)`,
                     }}
                     className="quantum-slider"
                   />
                 </div>
 
-                {/* Channel 2: Phase Dephasing T2 with SmartInfoTooltip */}
-                <div className="relative">
-                  <div className="flex justify-between items-center mb-1 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-800">
-                        Phase Dephasing (T₂)
+                <div>
+                  <div className="flex justify-between items-baseline mb-1.5 gap-1">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="font-semibold text-[#11151C] text-xs truncate">
+                        Phase Dephasing (1/T₂)
                       </span>
-                      
                       <SmartInfoTooltip
-                        width={275}
+                        width={265}
                         content={
                           <div className="space-y-1.5">
-                            <div className="font-bold text-blue-300">Phase Dephasing (T₂)</div>
-                            <p className="text-slate-300 text-[10px] leading-relaxed">
-                              Transverse coherence loss: Field fluctuations scramble relative phase without energy loss.
+                            <div className="font-semibold text-[#93C5FD]">Phase Dephasing (1/T₂)</div>
+                            <p className="text-[#CBD5E1] text-[10px] leading-relaxed">
+                              Transverse coherence loss: Field fluctuations scramble relative phase; enforced ≥ 0.5 · (1/T₁).
                             </p>
-                            <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                            <div className="font-mono text-[10px] bg-[#1E293B] text-[#BFDBFE] px-2 py-1 rounded border border-[#334155]">
                               ρ₀₁(t) = ρ₀₁(0) · e^(-t / T₂)
-                            </div>
-                            <div className="text-[9px] text-amber-200 bg-amber-950 p-1.5 rounded border border-amber-800 leading-tight">
-                              <strong>Why %?</strong> Represents phase scrambling severity λ = 1 − e^(-t/T₂): 0% = full phase coherence, 100% = completely randomized phase.
                             </div>
                           </div>
                         }
                       />
                     </div>
-
-                    <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                      {(noise.t2 * 100).toFixed(0)}%
+                    <span className="font-mono font-bold text-[#2563EB] text-xs shrink-0 tabular-nums">
+                      {Math.round(noise.t2 * 100)}%
                     </span>
                   </div>
 
@@ -677,137 +718,282 @@ export default function App() {
                     max={100}
                     value={Math.round(noise.t2 * 100)}
                     onChange={(e) => {
-                      const val = Number(e.target.value) / 100
-                      setNoise((prev) => ({ ...prev, t2: val }))
+                      const rawPct = Number(e.target.value)
+                      const minT2Pct = Math.ceil(0.5 * Math.round(noise.t1 * 100))
+                      const clampedPct = Math.max(rawPct, minT2Pct)
+                      setNoise((prev) => ({ ...prev, t2: clampedPct / 100 }))
                       setSelectedPresetLabel('Custom Configuration')
                     }}
                     style={{
-                      background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round(noise.t2 * 100)}%, #E2E8F0 ${Math.round(noise.t2 * 100)}%, #E2E8F0 100%)`,
+                      background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round(noise.t2 * 100)}%, #DFDBD0 ${Math.round(noise.t2 * 100)}%, #DFDBD0 100%)`,
                     }}
                     className="quantum-slider"
                   />
                 </div>
+              </div>
 
-                {/* ── SIMULATION PRESETS AS SLEEK DROP-UP MENU ─────────────── */}
-                <div className="pt-2 relative" ref={presetDropdownRef}>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Simulation Preset
-                  </label>
-                  
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowPresetMenu((prev) => !prev)
-                    }}
-                    className="w-full py-2 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold flex items-center justify-between cursor-pointer shadow-xs transition-colors"
-                  >
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <Zap size={14} className="text-blue-600 shrink-0" />
-                      <span className="truncate">{selectedPresetLabel}</span>
-                    </div>
-                    <ChevronDown
-                      size={14}
-                      className={`text-slate-400 shrink-0 transition-transform duration-200 ${
-                        showPresetMenu ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-
-                  {/* Drop-Up Menu with SmartInfoTooltips (Never Clipped, Portal-Rendered) */}
-                  <AnimatePresence>
-                    {showPresetMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute bottom-full mb-1.5 left-0 right-0 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-40 max-h-64 overflow-y-auto space-y-2 text-xs"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {/* Group 1: Noise Regimes */}
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1">
-                            <Zap size={11} className="text-blue-600" />
-                            <span>Noise Regimes</span>
-                          </div>
-                          <div className="space-y-0.5">
-                            {ALL_SIMULATION_PRESETS.filter((p) => p.category === 'Regimes').map((p) => (
-                              <div
-                                key={p.id}
-                                onClick={() => handleSelectPreset(p)}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between group ${
-                                  selectedPresetLabel === p.label ? 'bg-blue-100 border border-blue-200' : ''
-                                }`}
-                              >
-                                <span className="font-bold text-slate-800 text-[11px] truncate pr-2">
-                                  {p.label}
-                                </span>
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  <SmartInfoTooltip
-                                    width={220}
-                                    content={
-                                      <div className="text-[10px] font-sans text-slate-200 leading-normal">
-                                        {p.detail}
-                                      </div>
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            ))}
+              {/* Divider + "DISCRETE GATE ERRORS" with Single (?) Tooltip */}
+              <div className="mt-3 pt-2.5 border-t-2 border-[#11151C]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#11151C]">
+                      Discrete Gate Errors
+                    </span>
+                    <SmartInfoTooltip
+                      width={275}
+                      content={
+                        <div className="space-y-1.5">
+                          <div className="font-semibold text-[#93C5FD]">Why Max 50% Cap?</div>
+                          <p className="text-[#CBD5E1] text-[10px] leading-relaxed">
+                            At <strong>50%</strong>, bit-flip and phase-flip noise reach maximum randomness (zero Bloch vector length). Values <strong>&gt; 50%</strong> invert the state deterministically past the origin instead of adding noise.
+                          </p>
+                          <div className="font-mono text-[9.5px] bg-[#1E293B] text-[#BFDBFE] px-2 py-1 rounded border border-[#334155]">
+                            X/Z scale: (1 − 2p) · Depol: 1 − (4/3)p
                           </div>
                         </div>
-
-                        {/* Group 2: Hardware Platforms (No "Module 2") */}
-                        <div className="pt-1 border-t border-slate-100">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1">
-                            <Cpu size={11} className="text-indigo-600" />
-                            <span>Hardware Platforms</span>
-                          </div>
-                          <div className="space-y-0.5">
-                            {ALL_SIMULATION_PRESETS.filter((p) => p.category === 'Hardware').map((p) => (
-                              <div
-                                key={p.id}
-                                onClick={() => handleSelectPreset(p)}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between group ${
-                                  selectedPresetLabel === p.label ? 'bg-blue-100 border border-blue-200' : ''
-                                }`}
-                              >
-                                <span className="font-bold text-slate-800 text-[11px] truncate pr-2">
-                                  {p.label}
-                                </span>
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  <SmartInfoTooltip
-                                    width={240}
-                                    content={
-                                      <div className="text-[10px] font-sans text-slate-200 leading-normal">
-                                        {p.detail}
-                                      </div>
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      }
+                    >
+                      <div className="w-4 h-4 rounded-full bg-[#F8F5EE] hover:bg-[#D4F74A] text-[#11151C] flex items-center justify-center transition-colors font-mono text-[10px] font-bold border border-[#11151C]">
+                        ?
+                      </div>
+                    </SmartInfoTooltip>
+                  </div>
+                  <span className="font-mono text-[11px] font-semibold text-[#475569]">0% – 50%</span>
                 </div>
+
+                {/* Row 2: 3 Compact Pauli Columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex justify-between items-baseline mb-1.5 gap-1">
+                      <span className="font-semibold text-[#11151C] text-xs truncate">
+                        Bit-Flip (pₓ)
+                      </span>
+                      <span className="font-mono font-bold text-[#2563EB] text-[11px] shrink-0 tabular-nums">
+                        {Math.round(noise.px * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={Math.round(noise.px * 100)}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) / 100
+                        setNoise((prev) => ({ ...prev, px: val }))
+                        setSelectedPresetLabel('Custom Configuration')
+                      }}
+                      style={{
+                        background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((noise.px / 0.5) * 100)}%, #DFDBD0 ${Math.round((noise.px / 0.5) * 100)}%, #DFDBD0 100%)`,
+                      }}
+                      className="quantum-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-baseline mb-1.5 gap-1">
+                      <span className="font-semibold text-[#11151C] text-xs truncate">
+                        Phase-Flip (p<sub>z</sub>)
+                      </span>
+                      <span className="font-mono font-bold text-[#2563EB] text-[11px] shrink-0 tabular-nums">
+                        {Math.round(noise.pz * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={Math.round(noise.pz * 100)}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) / 100
+                        setNoise((prev) => ({ ...prev, pz: val }))
+                        setSelectedPresetLabel('Custom Configuration')
+                      }}
+                      style={{
+                        background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((noise.pz / 0.5) * 100)}%, #DFDBD0 ${Math.round((noise.pz / 0.5) * 100)}%, #DFDBD0 100%)`,
+                      }}
+                      className="quantum-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-baseline mb-1.5 gap-1">
+                      <span className="font-semibold text-[#11151C] text-xs truncate">
+                        Depolarizing (p)
+                      </span>
+                      <span className="font-mono font-bold text-[#2563EB] text-[11px] shrink-0 tabular-nums">
+                        {Math.round(noise.p * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={Math.round(noise.p * 100)}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) / 100
+                        setNoise((prev) => ({ ...prev, p: val }))
+                        setSelectedPresetLabel('Custom Configuration')
+                      }}
+                      style={{
+                        background: `linear-gradient(to right, #2563EB 0%, #2563EB ${Math.round((noise.p / 0.5) * 100)}%, #DFDBD0 ${Math.round((noise.p / 0.5) * 100)}%, #DFDBD0 100%)`,
+                      }}
+                      className="quantum-slider"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Simulation Preset Selector */}
+              <div className="mt-3 relative" ref={presetDropdownRef}>
+                <label className="text-[11px] font-semibold text-[#334155] block mb-1">
+                  Simulation Preset
+                </label>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowPresetMenu((prev) => !prev)
+                  }}
+                  className="w-full py-2 px-3 rounded-lg border-[1.5px] border-[#11151C] bg-[#F8F5EE] hover:bg-white text-[#11151C] text-xs font-medium flex items-center justify-between cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2 truncate pr-2">
+                    <Zap size={13} className="text-[#2563EB] shrink-0" />
+                    <span className="truncate">{renderPresetLabel(selectedPresetLabel)}</span>
+                  </div>
+                  <ChevronDown
+                    size={14}
+                    className={`text-[#11151C] shrink-0 transition-transform duration-150 ${
+                      showPresetMenu ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {showPresetMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 3, scale: 0.98 }}
+                      transition={{ duration: 0.14 }}
+                      className="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl shadow-[3px_3px_0px_#11151C] border-2 border-[#11151C] p-2 z-40 max-h-64 overflow-y-auto space-y-2 text-xs"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Group 1: Continuous Regimes */}
+                      <div>
+                        <div className="text-[10px] font-bold text-[#475569] uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
+                          <Zap size={11} className="text-[#2563EB]" />
+                          <span>Continuous Regimes (T₁ / T₂)</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {ALL_SIMULATION_PRESETS.filter((p) => p.category === 'Continuous').map((p) => (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectPreset(p)}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#F8F5EE] transition-colors cursor-pointer flex items-center justify-between ${
+                                selectedPresetLabel === p.label ? 'bg-[#EFF6FF] border border-[#2563EB] font-semibold' : 'border border-transparent'
+                              }`}
+                            >
+                              <span className="text-[#11151C] text-[11.5px] truncate pr-2">
+                                {renderPresetLabel(p.label)}
+                              </span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SmartInfoTooltip
+                                  width={235}
+                                  content={
+                                    <div className="text-[10px] font-sans text-[#E2E8F0] leading-normal">
+                                      {p.detail}
+                                    </div>
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Group 2: Discrete Pauli Channels */}
+                      <div className="pt-1 border-t border-[#E5E0D5]">
+                        <div className="text-[10px] font-bold text-[#475569] uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
+                          <Activity size={11} className="text-[#2563EB]" />
+                          <span>Discrete Pauli Channels</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {ALL_SIMULATION_PRESETS.filter((p) => p.category === 'Pauli').map((p) => (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectPreset(p)}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#F8F5EE] transition-colors cursor-pointer flex items-center justify-between ${
+                                selectedPresetLabel === p.label ? 'bg-[#EFF6FF] border border-[#2563EB] font-semibold' : 'border border-transparent'
+                              }`}
+                            >
+                              <span className="text-[#11151C] text-[11.5px] truncate pr-2">
+                                {renderPresetLabel(p.label)}
+                              </span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SmartInfoTooltip
+                                  width={240}
+                                  content={
+                                    <div className="text-[10px] font-sans text-[#E2E8F0] leading-normal">
+                                      {p.detail}
+                                    </div>
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Group 3: Hardware Platforms */}
+                      <div className="pt-1 border-t border-[#E5E0D5]">
+                        <div className="text-[10px] font-bold text-[#475569] uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
+                          <Cpu size={11} className="text-[#11151C]" />
+                          <span>Hardware Platforms</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {ALL_SIMULATION_PRESETS.filter((p) => p.category === 'Hardware').map((p) => (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectPreset(p)}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#F8F5EE] transition-colors cursor-pointer flex items-center justify-between ${
+                                selectedPresetLabel === p.label ? 'bg-[#EFF6FF] border border-[#2563EB] font-semibold' : 'border border-transparent'
+                              }`}
+                            >
+                              <span className="text-[#11151C] text-[11.5px] truncate pr-2">
+                                {renderPresetLabel(p.label)}
+                              </span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SmartInfoTooltip
+                                  width={245}
+                                  content={
+                                    <div className="text-[10px] font-sans text-[#E2E8F0] leading-normal">
+                                      {p.detail}
+                                    </div>
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
-            {/* Simulation Action Buttons & Live Progress Indicator */}
-            <div className="pt-2.5 border-t border-slate-100">
+            {/* Simulation Transport Action Buttons & Evolution Progress */}
+            <div className="pt-2.5 border-t-2 border-[#11151C]">
               {playing && (
                 <div className="mb-2">
-                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mb-1">
+                  <div className="flex justify-between items-center text-[11px] font-mono text-[#475569] mb-1 tabular-nums">
                     <span>Evolution Time: {(progress * 100).toFixed(0)}%</span>
-                    <span>t / τ: {progress.toFixed(2)}</span>
+                    <span>t / τ = {progress.toFixed(2)}</span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-[#DFDBD0] border border-[#11151C] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-600 transition-all duration-75"
+                      className="h-full bg-[#2563EB] transition-all duration-75"
                       style={{ width: `${Math.round(progress * 100)}%` }}
                     />
                   </div>
@@ -818,16 +1004,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={startSim}
-                  className="flex-1 btn-quantum-action text-white font-semibold py-2 px-4 rounded-lg shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] text-xs"
+                  className="flex-1 btn-quantum-action text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 cursor-pointer text-xs"
                 >
                   {playing ? (
                     <>
-                      <Pause size={14} />
+                      <Pause size={13} />
                       <span>Pause Simulation</span>
                     </>
                   ) : (
                     <>
-                      <Play size={14} fill="currentColor" />
+                      <Play size={13} fill="currentColor" />
                       <span>Run Simulation</span>
                     </>
                   )}
@@ -836,7 +1022,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] text-xs"
+                  className="bg-white hover:bg-[#F8F5EE] active:translate-x-[1px] active:translate-y-[1px] text-[#11151C] font-semibold py-2 px-4 rounded-lg border-[1.5px] border-[#11151C] shadow-[2px_2px_0px_#11151C] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"
                 >
                   <RotateCcw size={13} />
                   <span>Reset</span>
@@ -846,34 +1032,34 @@ export default function App() {
           </motion.div>
         </div>
 
-        {/* ── RIGHT PANEL: 3D BLOCH SPHERE & ANALYTICS (7 Cols) ────────────── */}
-        <div className="col-span-7 flex flex-col gap-3 min-h-0">
-          {/* Top HUD: Real-Time Metrics Strip */}
+        {/* ── RIGHT PANEL: TELEMETRY, 3D BLOCH SPHERE & DECAY CURVE (7 Cols) ─── */}
+        <div className="col-span-1 lg:col-span-7 flex flex-col gap-3 min-h-0">
+          {/* Top Telemetry Strip */}
           <motion.div
             variants={cardVariant}
             initial="hidden"
             animate="show"
-            className="grid grid-cols-3 gap-3 bg-white rounded-xl border border-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-3 shrink-0"
+            className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#11151C] poster-card rounded-xl p-3 shrink-0 gap-3 sm:gap-0"
           >
             {/* Metric 1: Fidelity F */}
-            <div className="flex flex-col justify-between border-r border-slate-100 pr-3">
+            <div className="flex flex-col justify-between sm:pr-3.5 pb-2.5 sm:pb-0">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-[#334155]">
                     State Fidelity F
                   </span>
                   <SmartInfoTooltip
                     width={260}
                     content={
                       <div className="space-y-1">
-                        <div className="font-bold text-blue-300">Quantum State Fidelity</div>
-                        <p className="text-slate-300 text-[10px] leading-relaxed">
+                        <div className="font-semibold text-[#93C5FD]">Quantum State Fidelity</div>
+                        <p className="text-[#CBD5E1] text-[10px] leading-relaxed">
                           Overlap probability between ideal pure state |ψ₀⟩ and decohered mixed state ρ(t).
                         </p>
-                        <div className="font-mono text-[10px] bg-slate-800 text-blue-200 px-2 py-1 rounded border border-slate-700">
+                        <div className="font-mono text-[10px] bg-[#1E293B] text-[#BFDBFE] px-2 py-1 rounded border border-[#334155]">
                           F = ⟨ψ₀|ρ|ψ₀⟩ = Tr(ρ₀ · ρ)
                         </div>
-                        <p className="text-slate-400 text-[9px]">
+                        <p className="text-[#94A3B8] text-[9px]">
                           Evaluated via Bloch vectors: F = (1 + r₀ · r) / 2
                         </p>
                       </div>
@@ -881,89 +1067,85 @@ export default function App() {
                   />
                 </div>
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${fidStatus.color}`}
+                  className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-md border ${fidStatus.color}`}
                 >
+                  <span className={`w-1.5 h-1.5 rounded-full ${fidStatus.dot}`} />
                   {fidStatus.label}
                 </span>
               </div>
-              <div className="font-mono text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+              <div className="font-display text-[32px] font-extrabold text-[#11151C] tracking-tight tabular-nums leading-none mt-1">
                 {qState.fidelity.toFixed(3)}
               </div>
-              <span className="text-[10px] text-slate-500 font-mono mt-0.5 font-medium">
-                F = ⟨ψ₀|ρ|ψ₀⟩, ρ₀ = |ψ₀⟩⟨ψ₀|
+              <span className="text-[11px] text-[#475569] font-mono font-medium mt-1">
+                F = ⟨ψ₀|ρ|ψ₀⟩
               </span>
             </div>
 
             {/* Metric 2: Decoherence Error */}
-            <div className="flex flex-col justify-between border-r border-slate-100 pr-3">
+            <div className="flex flex-col justify-between sm:px-3.5 pb-2.5 sm:pb-0">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#334155]">
                   Decoherence Error
                 </span>
-                <span className="text-[10px] font-mono text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                <span className="text-[10.5px] font-mono font-bold text-[#DC2626] bg-[#FEF2F2] px-1.5 py-0.5 rounded border border-[#DC2626]">
                   1 − F
                 </span>
               </div>
-              <div className="font-mono text-2xl font-black text-rose-600 tracking-tight tabular-nums">
+              <div className="font-display text-[32px] font-extrabold text-[#DC2626] tracking-tight tabular-nums leading-none mt-1">
                 {qState.error.toFixed(3)}
               </div>
-              <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                Error = 1 − Fidelity
+              <span className="text-[11px] text-[#475569] font-mono font-medium mt-1">
+                Error = 1 − F
               </span>
             </div>
 
-            {/* Metric 3: Measurement Probabilities P(|0⟩) & P(|1⟩) */}
-            <div className="flex flex-col justify-between">
+            {/* Metric 3: Measurement Readout P(|0⟩) & P(|1⟩) */}
+            <div className="flex flex-col justify-between sm:pl-3.5">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Readout Probabilities
-                </span>
-                <span className="text-[10px] font-mono text-slate-500">
-                  P(0) + P(1) = 100%
+                <span className="text-xs font-bold text-[#334155]">
+                  Z-Basis Readout
                 </span>
               </div>
 
-              <div className="flex items-center justify-between font-mono text-xs font-bold text-slate-800 mb-1">
-                <span className="text-blue-700">P(|0⟩): {(qState.p0 * 100).toFixed(1)}%</span>
-                <span className="text-indigo-700">P(|1⟩): {(qState.p1 * 100).toFixed(1)}%</span>
+              <div className="flex items-baseline justify-between font-mono text-xs font-bold mb-1.5 tabular-nums">
+                <span className="text-[#2563EB]">P(|0⟩) {(qState.p0 * 100).toFixed(1)}%</span>
+                <span className="text-[#334155]">P(|1⟩) {(qState.p1 * 100).toFixed(1)}%</span>
               </div>
 
-              {/* Visual Split Probability Bar */}
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+              {/* Precision Split Probability Bar */}
+              <div className="w-full h-2.5 bg-[#E2E8F0] rounded-full overflow-hidden flex border border-[#11151C]">
                 <div
-                  className="bg-blue-600 transition-all duration-150"
+                  className="bg-[#2563EB] transition-all duration-150"
                   style={{ width: `${Math.round(qState.p0 * 100)}%` }}
                 />
                 <div
-                  className="bg-indigo-600 transition-all duration-150"
+                  className="bg-[#94A3B8] transition-all duration-150"
                   style={{ width: `${Math.round(qState.p1 * 100)}%` }}
                 />
               </div>
             </div>
           </motion.div>
 
-          {/* Middle: 3D Bloch Sphere Card */}
+          {/* 3D Bloch Sphere Viewport */}
           <motion.div
             variants={cardVariant}
             initial="hidden"
             animate="show"
-            className="flex-1 bg-white rounded-xl border border-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-3 relative min-h-[270px] flex flex-col"
+            className="h-[340px] lg:h-auto lg:flex-1 poster-card rounded-xl p-3.5 relative lg:min-h-[260px] flex flex-col"
           >
-            <div className="flex items-center justify-between mb-1 px-1">
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                <Compass size={14} className="text-blue-600" />
+            <div className="flex items-center justify-between mb-1 px-0.5">
+              <h2 className="text-[13.5px] font-bold text-[#11151C] tracking-tight">
                 Bloch Sphere Representation
               </h2>
 
-              {/* Legend: Ideal |ψ₀⟩ vs Decohered ρ(t) on top right of the sphere card */}
-              <div className="flex items-center gap-3 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-xs shadow-2xs">
+              <div className="flex items-center gap-3 bg-[#F8F5EE] px-2.5 py-1 rounded-md border border-[#11151C] text-[11px] font-semibold">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 shadow-xs"></span>
-                  <span className="font-semibold text-slate-700 text-[11px]">Ideal |ψ₀⟩</span>
+                  <span className="w-2 h-2 rounded-full bg-[#2563EB]"></span>
+                  <span className="text-[#11151C] font-mono">Ideal |ψ₀⟩</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-600 shadow-xs"></span>
-                  <span className="font-semibold text-slate-700 text-[11px]">Decohered ρ(t)</span>
+                  <span className="w-2 h-2 rounded-full bg-[#DC2626]"></span>
+                  <span className="text-[#11151C] font-mono">Decohered ρ(t)</span>
                 </div>
               </div>
             </div>
@@ -977,26 +1159,29 @@ export default function App() {
             </div>
           </motion.div>
 
-          {/* Bottom Card: Coherence Decay Curve F(t) (Generous 240px Height) */}
+          {/* Coherence Decay Curve F(t) */}
           <motion.div
             variants={cardVariant}
             initial="hidden"
             animate="show"
-            className="h-60 bg-white rounded-xl border border-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-3 flex flex-col shrink-0"
+            className="h-60 poster-card rounded-xl p-3.5 flex flex-col shrink-0"
           >
-            <div className="flex items-center justify-between mb-1 px-1">
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                <LineChart size={14} className="text-blue-600" />
+            <div className="flex items-center justify-between mb-1 px-0.5">
+              <h2 className="text-[13.5px] font-bold text-[#11151C] tracking-tight">
                 Coherence Decay Curve F(t)
               </h2>
-              <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-blue-600 font-mono font-semibold">--- Ideal (1.00)</span>
-                <span className="text-rose-600 font-mono font-semibold">― Decoherence F(t)</span>
+              <div className="flex items-center gap-3 text-[11px] font-mono">
+                <span className="text-[#2563EB] font-semibold">--- Ideal (1.00)</span>
+                <span className="text-[#DC2626] font-semibold">― Decoherence F(t)</span>
               </div>
             </div>
 
             <div className="flex-1 w-full h-full min-h-0">
-              <DecayCurveChart curve={curve} progress={progress} />
+              <DecayCurveChart
+                curve={curve}
+                progress={progress}
+                hasActiveNoise={hasActiveNoise(noise)}
+              />
             </div>
           </motion.div>
         </div>

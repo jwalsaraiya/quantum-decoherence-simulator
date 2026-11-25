@@ -1,13 +1,13 @@
 /**
  * quantumPhysics.ts
- * High-Precision BQT Quantum Decoherence & Relaxation Engine.
- * 
- * 100% Rigorous Implementation of Syllabus Concepts:
- * - Module 2 Part 2: Relaxation Times T₁ (Longitudinal) & T₂ (Transverse)
- * - Module 2 Part 3: Environmental Decoherence & Phase Scrambling
- * - Module 2 Part 4: Quantum State Fidelity F = (1 + r₀ · r) / 2, Error = 1 - F
+ * High-Precision BQT Quantum Decoherence & Noise Engine.
+ *
+ * 100% Rigorous Implementation of BQT Syllabus Concepts (Modules 2 & 3):
+ * - Module 2: Continuous Relaxation Rates (1/T₁ Longitudinal & 1/T₂ Transverse)
+ * - Module 2: Physical Coherence Bound T₂ ≤ 2T₁ (1/T₂ ≥ 0.5 · 1/T₁)
+ * - Module 3: Discrete Pauli Error Channels (Bit-Flip pₓ, Phase-Flip p_z, Depolarizing p)
+ * - Quantum State Fidelity: F = (1 + r₀ · r) / 2, Error = 1 - F
  * - Readout Probabilities: P(|0⟩) = (1 + z)/2, P(|1⟩) = (1 - z)/2
- * - Fundamental Physical Law: T₂ ≤ 2T₁ (1/T₂ = 1/(2T₁) + 1/T_phi)
  */
 
 export interface BlochVector {
@@ -28,24 +28,32 @@ export interface QuantumState {
 }
 
 export interface NoiseParams {
-  t1: number // Energy relaxation probability / rate parameter [0.00, 1.00]
-  t2: number // Pure dephasing probability / rate parameter [0.00, 1.00]
+  t1: number // Continuous Energy Relaxation Rate (1/T₁) [0.00, 1.00]
+  t2: number // Continuous Phase Dephasing Rate (1/T₂) [0.00, 1.00]
+  px: number // Discrete Bit-Flip Noise probability (pₓ) [0.00, 0.50]
+  pz: number // Discrete Phase-Flip Noise probability (p_z) [0.00, 0.50]
+  p: number // Discrete Depolarizing Noise probability (p) [0.00, 0.50]
 }
 
 // Canonical exponential decay curvature matching textbook inversion-recovery & Ramsey curves
 const EXP_CURVATURE = 3.5
 
 /**
- * Computes exact Bloch vector and density matrix state under Kraus / Lindblad dynamics.
- * 
- * Physics Guarantees:
- * 1. At t1 = 1.0 (100% energy relaxation), excited state |1⟩ decays completely to ground state |0⟩.
- *    Any state relaxes to z = 1.0, with x = 0, y = 0.
- *    Fidelity with an equatorial state (|+⟩, |-⟩, |+i⟩, |-i⟩) is EXACTLY 0.500.
- *    Measurement probabilities: P(|0⟩) = 100.0%, P(|1⟩) = 0.0%.
- * 2. Ground state |0⟩ (z = 1) is completely stable under any relaxation or dephasing: F = 1.000.
- * 3. Pure dephasing (t2 = 1.0, t1 = 0) scrambles equatorial coherences to origin (0, 0, 0),
- *    yielding F = 0.500 and P(|0⟩) = 50.0%, P(|1⟩) = 50.0% without losing energy.
+ * Returns true if any continuous or discrete noise channel is non-zero.
+ */
+export function hasActiveNoise(noise: NoiseParams): boolean {
+  return (
+    noise.t1 > 0 ||
+    noise.t2 > 0 ||
+    noise.px > 0 ||
+    noise.pz > 0 ||
+    noise.p > 0
+  )
+}
+
+/**
+ * Computes exact Bloch vector and density matrix state under combined
+ * Continuous Lindblad (T₁/T₂) relaxation and Discrete Pauli (pₓ, p_z, p) channels.
  */
 export function computeQuantumState(
   theta: number,
@@ -60,36 +68,46 @@ export function computeQuantumState(
   let y0 = Math.sin(theta) * Math.sin(phi)
   let z0 = Math.cos(theta)
 
-  // Clean floating-point artifacts near zero
   if (Math.abs(x0) < 1e-12) x0 = 0
   if (Math.abs(y0) < 1e-12) y0 = 0
   if (Math.abs(z0) < 1e-12) z0 = 0
 
-  // 2. Continuous-time exponential progression matching syllabus curves:
-  // Shape increases monotonically from 0 (at t=0) to 1.0 (at t=1)
+  // 2. Normalized exponential progression shape ∈ [0, 1]
   const shape =
     t === 0
       ? 0
       : (1.0 - Math.exp(-EXP_CURVATURE * t)) / (1.0 - Math.exp(-EXP_CURVATURE))
 
-  const gamma = Math.min(1, Math.max(0, noise.t1 * shape)) // Longitudinal damping probability
-  const lam = Math.min(1, Math.max(0, noise.t2 * shape)) // Pure transverse dephasing probability
+  // 3. Continuous Relaxation (Module 2: 1/T₁ and 1/T₂)
+  const gamma = Math.min(1, Math.max(0, noise.t1 * shape))
+  const lam = Math.min(1, Math.max(0, noise.t2 * shape))
 
-  // 3. Longitudinal Dynamics (T₁ Energy Relaxation |1⟩ → |0⟩):
-  // Ground state |0⟩ (z0 = 1) has ΔE = 0, thus immune to decay.
-  // Excited state |1⟩ (z0 = -1) loses energy ΔE = hf and decays to |0⟩ (z = 1).
-  const z = z0 + gamma * (1.0 - z0)
-
-  // 4. Transverse Dynamics (T₂ Coherence & Equator Dephasing):
-  // By physical law (Module 2 §2.4, T₂ ≤ 2T₁):
-  // Spontaneous emission inherently reduces off-diagonal coherences by √(1 - γ).
-  // Pure dephasing (random frequency fluctuations without energy loss) further scales coherences by (1 - λ).
+  const zCont = z0 + gamma * (1.0 - z0)
   const transverseFactor = Math.sqrt(Math.max(0, 1.0 - gamma)) * (1.0 - lam)
-  const x = x0 * transverseFactor
-  const y = y0 * transverseFactor
+  const xCont = x0 * transverseFactor
+  const yCont = y0 * transverseFactor
 
-  // 5. Bloch vector magnitude |r| (Quantum Purity):
-  // Pure state |r| = 1; Mixed state |r| < 1; Maximally mixed state |r| = 0.
+  // 4. Discrete Pauli Noise Channels (Module 3: pₓ, p_z, p)
+  // - Bit-flip (pₓ) scales r_y and r_z by (1 - 2 * pₓ)
+  // - Phase-flip (p_z) scales r_x and r_y by (1 - 2 * p_z)
+  // - Depolarizing (p) scales r_x, r_y, and r_z uniformly by max(0, 1 - (4/3) * p)
+  const pxEff = Math.min(0.5, Math.max(0, noise.px * shape))
+  const pzEff = Math.min(0.5, Math.max(0, noise.pz * shape))
+  const pEff = Math.min(0.5, Math.max(0, noise.p * shape))
+
+  const bitFlipScale = 1.0 - 2.0 * pxEff
+  const phaseFlipScale = 1.0 - 2.0 * pzEff
+  const depolScale = Math.max(0, 1.0 - (4.0 / 3.0) * pEff)
+
+  let x = xCont * phaseFlipScale * depolScale
+  let y = yCont * bitFlipScale * phaseFlipScale * depolScale
+  let z = zCont * bitFlipScale * depolScale
+
+  if (Math.abs(x) < 1e-12) x = 0
+  if (Math.abs(y) < 1e-12) y = 0
+  if (Math.abs(z) < 1e-12) z = 0
+
+  // 5. Bloch vector magnitude |r| (Quantum Purity indicator)
   const rSquared = x * x + y * y + z * z
   const coherenceRadius = Math.min(1, Math.sqrt(Math.max(0, rSquared)))
 
@@ -99,7 +117,6 @@ export function computeQuantumState(
   const error = Math.max(0, Math.min(1, 1.0 - fidelity))
 
   // 7. Measurement Probabilities in Computational Basis {|0⟩, |1⟩}
-  // P(|0⟩) = (1 + z)/2, P(|1⟩) = (1 - z)/2
   const p0 = Math.max(0, Math.min(1, (1.0 + z) / 2.0))
   const p1 = Math.max(0, Math.min(1, 1.0 - p0))
 
@@ -119,13 +136,10 @@ export function computeQuantumState(
 }
 
 /**
- * Formats state string matching standard textbook / syllabus notation:
- * - Bases: |0⟩, |1⟩, (|0⟩ + |1⟩)/√2, (|0⟩ − |1⟩)/√2, (|0⟩ + i|1⟩)/√2, (|0⟩ − i|1⟩)/√2
- * - Custom: α|0⟩ + e^(iφ)β|1⟩
+ * Formats state string matching standard textbook / syllabus notation.
  */
 function formatStateFormula(theta: number, phi: number): string {
   const EPS = 1e-3
-  // Check cardinal states
   if (Math.abs(theta) < EPS) return '|0⟩'
   if (Math.abs(theta - Math.PI) < EPS) return '|1⟩'
   if (Math.abs(theta - Math.PI / 2) < EPS) {
@@ -177,12 +191,6 @@ export function buildDecayCurve(
   })
 }
 
-/**
- * Canonical Quantum States:
- * - Z Basis (Computational): |0⟩ (Ground), |1⟩ (Excited)
- * - X Basis (Hadamard): |+⟩ (Superposition), |−⟩ (Phase π)
- * - Y Basis (Imaginary): |+i⟩ (Phase +90°), |−i⟩ (Phase −90°)
- */
 export const PRESETS = {
   plus: { theta: Math.PI / 2, phi: 0, label: '|+⟩', desc: 'Superposition' },
   zero: { theta: 0, phi: 0, label: '|0⟩', desc: 'Ground State' },
@@ -193,60 +201,3 @@ export const PRESETS = {
 } as const
 
 export type PresetKey = keyof typeof PRESETS | 'custom'
-
-/**
- * Real Physical Hardware Qubit Presets (Module 2 §1.1 - §1.5)
- */
-export interface HardwarePreset {
-  id: string
-  name: string
-  platform: string
-  t1: number
-  t2: number
-  t1Physical: string
-  t2Physical: string
-  mechanism: string
-}
-
-export const HARDWARE_PRESETS: HardwarePreset[] = [
-  {
-    id: 'transmon',
-    name: 'Superconducting Transmon',
-    platform: 'IBM Quantum / Google Sycamore',
-    t1: 0.45,
-    t2: 0.65,
-    t1Physical: '~80 – 120 μs',
-    t2Physical: '~50 – 80 μs',
-    mechanism: 'Josephson junction non-linear LC oscillator; limited by dielectric surface loss & flux noise.',
-  },
-  {
-    id: 'trapped_ion',
-    name: 'Trapped Ion (Yb⁺ / Ca⁺)',
-    platform: 'IonQ / Quantinuum',
-    t1: 0.05,
-    t2: 0.15,
-    t1Physical: '> 10 – 1000 s',
-    t2Physical: '~1 – 5 s',
-    mechanism: 'Ultra-isolated atomic ions in RF Paul trap; exceptional coherence, limited by laser phase jitter.',
-  },
-  {
-    id: 'nv_center',
-    name: 'NV Center in Diamond',
-    platform: 'Solid-State Spin',
-    t1: 0.25,
-    t2: 0.6,
-    t1Physical: '~1 ms – 1 s',
-    t2Physical: '~0.5 – 2 ms',
-    mechanism: 'Room-temperature optical readout; dephasing driven by ¹³C nuclear spin bath fluctuations.',
-  },
-  {
-    id: 'photonic',
-    name: 'Photonic Qubit',
-    platform: 'PsiQuantum / Xanadu',
-    t1: 0.0,
-    t2: 0.12,
-    t1Physical: 'Infinite (No relaxation)',
-    t2Physical: 'Path / Phase Drift',
-    mechanism: 'Flying photons exhibit zero spontaneous energy decay; decoherence is optical waveguide loss.',
-  },
-]

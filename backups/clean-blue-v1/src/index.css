@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Standard sRGB Hex colors for 100% universal browser compatibility (Windows 7/8/8.1, Linux, macOS, iOS, Android) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
+
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-rose-900: #881337;
+  --color-rose-950: #4c0519;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
+
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+}
+
+html, body {
+  font-family: var(--font-sans);
+  background-color: #F5F7FA;
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+kbd,
+samp,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Primary Blue Hardware Action Button (No gradient cliché, pure Cobalt #2563EB) */
+.btn-quantum-action {
+  background-color: #2563EB;
+  border: 1px solid #1D4ED8;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.22);
+  transition: background-color 0.14s ease, transform 0.1s ease, box-shadow 0.14s ease;
+}
+.btn-quantum-action:hover {
+  background-color: #1D4ED8;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
+}
+.btn-quantum-action:active {
+  transform: scale(0.97);
+}
+
+/* Precision Cobalt Range Sliders */
+.quantum-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  background: #E2E8F0;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.quantum-slider:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 4px;
+}
+
+.quantum-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2563EB;
+  cursor: grab;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+
+.quantum-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.14);
+  background: #1D4ED8;
+}
+
+.quantum-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.0);
+  background: #1E40AF;
+}
+
+.quantum-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2563EB;
+  cursor: grab;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+
+.quantum-slider::-moz-range-thumb:hover {
+  transform: scale(1.14);
+  background: #1D4ED8;
+}
+
+.quantum-slider::-moz-range-track {
+  height: 5px;
+  background: #E2E8F0;
+  border-radius: 9999px;
+}
+
+/* Custom Scrollbar for Panel & Dropdown */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}

@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Barlow Condensed', 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Standard sRGB Hex colors for 100% universal browser compatibility (Windows 7/8/8.1, Linux, macOS, iOS, Android) */
   --color-slate-50: #f8fafc;
@@ -17,18 +18,6 @@
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
 
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
-  --color-gray-950: #030712;
-
   --color-blue-50: #eff6ff;
   --color-blue-100: #dbeafe;
   --color-blue-200: #bfdbfe;
@@ -40,18 +29,6 @@
   --color-blue-800: #1e40af;
   --color-blue-900: #1e3a8a;
   --color-blue-950: #172554;
-
-  --color-indigo-50: #eef2ff;
-  --color-indigo-100: #e0e7ff;
-  --color-indigo-200: #c7d2fe;
-  --color-indigo-300: #a5b4fc;
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
-  --color-indigo-800: #3730a3;
-  --color-indigo-900: #312e81;
-  --color-indigo-950: #1e1b4b;
 
   --color-emerald-50: #ecfdf5;
   --color-emerald-100: #d1fae5;
@@ -107,11 +84,14 @@
 
 html, body {
   font-family: var(--font-sans);
-  background-color: #F8FAFC;
-  color: #0F172A;
+  background-color: #F3EFE6;
+  color: #11151C;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.015em;
+}
+
+.font-display {
+  font-family: var(--font-display);
 }
 
 code,
@@ -124,100 +104,96 @@ pre,
   font-variant-numeric: tabular-nums;
 }
 
-/* Universal fallbacks for opacity and slash utilities (Windows 7/8/8.1, Linux, Chrome <= 109, Firefox ESR) */
-.bg-white\/95 { background-color: #FFFFFF !important; background-color: rgba(255, 255, 255, 0.95) !important; }
-.bg-white\/90 { background-color: #FFFFFF !important; background-color: rgba(255, 255, 255, 0.90) !important; }
-.bg-slate-900\/95 { background-color: #0F172A !important; background-color: rgba(15, 23, 42, 0.95) !important; }
-.bg-slate-800\/90 { background-color: #1E293B !important; background-color: rgba(30, 41, 59, 0.90) !important; }
-.bg-blue-50\/95 { background-color: #EFF6FF !important; background-color: rgba(239, 246, 255, 0.95) !important; }
-.bg-blue-50\/70 { background-color: #EFF6FF !important; background-color: rgba(239, 246, 255, 0.70) !important; }
-.bg-indigo-50\/95 { background-color: #EEF2FF !important; background-color: rgba(238, 242, 255, 0.95) !important; }
-.bg-amber-950\/40 { background-color: #451A03 !important; background-color: rgba(69, 26, 3, 0.40) !important; }
-.border-slate-700\/90 { border-color: #334155 !important; border-color: rgba(51, 65, 85, 0.90) !important; }
-.border-slate-700\/80 { border-color: #334155 !important; border-color: rgba(51, 65, 85, 0.80) !important; }
-.border-amber-800\/50 { border-color: #92400E !important; border-color: rgba(146, 64, 14, 0.50) !important; }
-.text-amber-200\/90 { color: #FDE68A !important; color: rgba(253, 230, 138, 0.90) !important; }
-
-/* Universal fallback for gradients & primary simulation button */
-.bg-gradient-to-r {
-  background-color: #2563EB;
-  background-image: linear-gradient(to right, #2563EB, #4F46E5) !important;
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
+/* Poster Print Card Surface */
+.poster-card {
+  background-color: #FFFFFF;
+  border: 1.5px solid #11151C;
+  border-radius: 10px;
+  box-shadow: 2.5px 2.5px 0px #11151C;
+}
+
+/* Bold Cobalt Action Button with Crisp Tactile Print Shadow */
 .btn-quantum-action {
   background-color: #2563EB;
-  background-image: linear-gradient(to right, #2563EB, #4F46E5);
+  border: 1.5px solid #11151C;
+  box-shadow: 2px 2px 0px #11151C;
+  transition: background-color 0.14s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 .btn-quantum-action:hover {
   background-color: #1D4ED8;
-  background-image: linear-gradient(to right, #1D4ED8, #4338CA);
+}
+.btn-quantum-action:active {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0.5px 0.5px 0px #11151C;
 }
 
-/* Custom Precision Sliders with Dynamic Track Fill */
+/* Print-Ink Range Sliders with Cobalt Fill */
 .quantum-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
-  background: #E2E8F0;
+  height: 5px;
+  background: #DFDBD0;
   border-radius: 9999px;
   outline: none;
-  transition: all 0.15s ease-in-out;
   cursor: pointer;
 }
 
-.quantum-slider:focus {
-  outline: none;
+.quantum-slider:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 4px;
 }
 
 .quantum-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #2563EB;
   cursor: grab;
-  border: 2.5px solid #FFFFFF;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35), 0 1px 2px rgba(15, 23, 42, 0.12);
-  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s, box-shadow 0.15s;
+  border: 2px solid #11151C;
+  box-shadow: 1px 1px 0px #11151C;
+  transition: transform 0.12s ease, background-color 0.12s ease;
 }
 
 .quantum-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.14);
   background: #1D4ED8;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
 }
 
 .quantum-slider::-webkit-slider-thumb:active {
   cursor: grabbing;
-  transform: scale(1.05);
-  background: #1E40AF;
+  transform: scale(0.98);
 }
 
 .quantum-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #2563EB;
   cursor: grab;
-  border: 2.5px solid #FFFFFF;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35), 0 1px 2px rgba(15, 23, 42, 0.12);
-  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s;
+  border: 2px solid #11151C;
+  box-shadow: 1px 1px 0px #11151C;
+  transition: transform 0.12s ease, background-color 0.12s ease;
 }
 
 .quantum-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.14);
   background: #1D4ED8;
 }
 
 .quantum-slider::-moz-range-track {
-  height: 6px;
-  background: #E2E8F0;
+  height: 5px;
+  background: #DFDBD0;
   border-radius: 9999px;
 }
 
-/* Custom Scrollbar for Panel */
+/* Custom Scrollbar for Panel & Dropdown */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -226,9 +202,9 @@ pre,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: #C8C2B4;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #9E9788;
 }

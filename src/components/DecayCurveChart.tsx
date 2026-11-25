@@ -19,13 +19,18 @@ interface DataPoint {
 interface Props {
   curve: DataPoint[]
   progress: number // Simulation time [0, 1]
+  hasActiveNoise?: boolean
 }
 
 const VIEW_W = 600
 const VIEW_H = 220
 const PADDING = { top: 20, right: 32, bottom: 42, left: 54 }
 
-export default function DecayCurveChart({ curve, progress }: Props) {
+export default function DecayCurveChart({
+  curve,
+  progress,
+  hasActiveNoise = false,
+}: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredPoint, setHoveredPoint] = useState<{
     svgX: number
@@ -196,7 +201,7 @@ export default function DecayCurveChart({ curve, progress }: Props) {
                 x={PADDING.left - 9}
                 y={y + 3.5}
                 textAnchor="end"
-                className="font-mono text-[11px] fill-slate-500 font-semibold select-none"
+                className="font-mono text-[11px] fill-[#334155] font-semibold select-none"
               >
                 {val.toFixed(2)}
               </text>
@@ -223,14 +228,14 @@ export default function DecayCurveChart({ curve, progress }: Props) {
                 y1={VIEW_H - PADDING.bottom}
                 x2={x}
                 y2={VIEW_H - PADDING.bottom + 5}
-                stroke="#64748B"
+                stroke="#334155"
                 strokeWidth="1.2"
               />
               <text
                 x={x}
                 y={VIEW_H - PADDING.bottom + 18}
                 textAnchor="middle"
-                className="font-mono text-[11px] fill-slate-500 font-semibold select-none"
+                className="font-mono text-[11px] fill-[#334155] font-semibold select-none"
               >
                 {val.toFixed(2)}
               </text>
@@ -242,7 +247,7 @@ export default function DecayCurveChart({ curve, progress }: Props) {
         <polyline
           points={`${PADDING.left},${PADDING.top} ${PADDING.left},${VIEW_H - PADDING.bottom} ${VIEW_W - PADDING.right},${VIEW_H - PADDING.bottom}`}
           fill="none"
-          stroke="#475569"
+          stroke="#11151C"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -277,15 +282,17 @@ export default function DecayCurveChart({ curve, progress }: Props) {
           />
         )}
 
-        {/* Zero Noise Helper Hint in Center of Plot */}
+        {/* Zero Noise / Invariant Eigenstate Helper Hint in Center of Plot */}
         {isFlatCoherent && (
           <text
             x={(PADDING.left + VIEW_W - PADDING.right) / 2}
             y={PADDING.top + plotH / 2}
             textAnchor="middle"
-            className="text-[11px] fill-slate-400 font-medium select-none pointer-events-none"
+            className="text-[11.5px] fill-[#475569] font-medium select-none pointer-events-none"
           >
-            Zero noise active (100% Coherent) · Slide T₁ or T₂ to view exponential decay curve
+            {hasActiveNoise
+              ? 'Invariant Eigenstate (F = 1.000)'
+              : 'No active noise — adjust channels to view decay'}
           </text>
         )}
 
@@ -348,7 +355,7 @@ export default function DecayCurveChart({ curve, progress }: Props) {
           y={0}
           transform={`rotate(-90) translate(-${(PADDING.top + VIEW_H - PADDING.bottom) / 2}, 16)`}
           textAnchor="middle"
-          className="font-semibold text-[11px] fill-slate-600 select-none tracking-wide"
+          className="font-mono text-[11px] fill-[#334155] font-semibold select-none tracking-tight"
         >
           Fidelity F(t)
         </text>
@@ -358,7 +365,7 @@ export default function DecayCurveChart({ curve, progress }: Props) {
           x={(PADDING.left + VIEW_W - PADDING.right) / 2}
           y={VIEW_H - 6}
           textAnchor="middle"
-          className="font-semibold text-[11px] fill-slate-600 select-none tracking-wide"
+          className="font-mono text-[11px] fill-[#334155] font-semibold select-none tracking-tight"
         >
           Normalized Evolution Time (t / τ)
         </text>
@@ -367,22 +374,22 @@ export default function DecayCurveChart({ curve, progress }: Props) {
       {/* Floating Hover Tooltip */}
       {hoveredPoint && (
         <div
-          className="absolute pointer-events-none z-20 bg-slate-900 text-white rounded-lg shadow-xl px-3 py-1.5 text-xs font-mono border border-slate-700 transition-all duration-75"
+          className="absolute pointer-events-none z-20 bg-slate-900 text-white rounded-md shadow-lg px-2.5 py-1 text-[11px] font-mono border border-slate-700 transition-opacity duration-75"
           style={{
             left: `${((hoveredPoint.svgX - PADDING.left) / plotW) * 78 + 12}%`,
             top: `${(hoveredPoint.svgY / VIEW_H) * 80 + 5}%`,
             transform: 'translate(-50%, -120%)',
           }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 tabular-nums">
             <span>t: {hoveredPoint.t.toFixed(2)}</span>
-            <span className="text-slate-500">|</span>
-            <span className="text-blue-300 font-bold">
+            <span className="text-slate-600">|</span>
+            <span className="text-blue-300 font-semibold">
               F: {hoveredPoint.f.toFixed(3)}
             </span>
-            <span className="text-slate-500">|</span>
-            <span className="text-rose-300 font-bold">
-              Error: {hoveredPoint.err.toFixed(3)}
+            <span className="text-slate-600">|</span>
+            <span className="text-rose-300 font-semibold">
+              Err: {hoveredPoint.err.toFixed(3)}
             </span>
           </div>
         </div>

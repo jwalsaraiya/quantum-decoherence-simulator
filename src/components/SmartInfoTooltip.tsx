@@ -163,7 +163,7 @@ export default function SmartInfoTooltip({
         className={`inline-flex items-center justify-center cursor-pointer select-none ${className}`}
       >
         {children || (
-          <div className="w-4 h-4 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 flex items-center justify-center transition-colors">
+          <div className="w-4 h-4 rounded-full bg-[#F8F5EE] hover:bg-[#D4F74A] text-[#475569] hover:text-[#11151C] border border-[#CBD5E1] hover:border-[#11151C] flex items-center justify-center transition-colors">
             <Info size={iconSize} />
           </div>
         )}
@@ -196,11 +196,11 @@ export default function SmartInfoTooltip({
                   width,
                   zIndex: 99999,
                 }}
-                className="bg-slate-900 text-white p-2.5 rounded-xl shadow-2xl border border-slate-700 text-xs font-sans leading-relaxed select-none"
+                className="bg-[#11151C] text-white p-2.5 rounded-xl shadow-2xl border border-[#334155] text-xs font-sans leading-relaxed select-none"
               >
                 {/* Pointer Arrow */}
                 <div
-                  className={`absolute w-2 h-2 bg-slate-900 border-slate-700 rotate-45 ${
+                  className={`absolute w-2 h-2 bg-[#11151C] border-[#334155] rotate-45 ${
                     coords.placeAbove
                       ? 'bottom-[-5px] border-b border-r'
                       : 'top-[-5px] border-t border-l'

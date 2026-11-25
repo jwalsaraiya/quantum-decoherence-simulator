@@ -584,13 +584,13 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
       ref={containerRef}
       className="relative w-full h-full cursor-grab active:cursor-grabbing select-none overflow-hidden"
     >
-      {/* 6 Clean Dirac State Badges with Refined Frosted-Glass Styling */}
+      {/* 6 Crisp Poster-Framed Dirac Coordinate Tags */}
       {/* Z Basis: |0⟩ and |1⟩ */}
       <div
         ref={label0Ref}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
+        <span className="font-mono text-[11px] font-semibold text-[#11151C] bg-white px-2 py-0.5 rounded border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C]">
           |0⟩
         </span>
       </div>
@@ -599,7 +599,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={label1Ref}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
+        <span className="font-mono text-[11px] font-semibold text-[#11151C] bg-white px-2 py-0.5 rounded border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C]">
           |1⟩
         </span>
       </div>
@@ -609,7 +609,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelPlusRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md shadow-xs border border-blue-200">
+        <span className="font-mono text-[11px] font-semibold text-[#1D4ED8] bg-white px-2 py-0.5 rounded border border-[#2563EB] shadow-[1.5px_1.5px_0px_#2563EB]">
           |+⟩
         </span>
       </div>
@@ -618,7 +618,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelMinusRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
+        <span className="font-mono text-[11px] font-semibold text-[#11151C] bg-[#FAF7F0] px-2 py-0.5 rounded border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C]">
           |−⟩
         </span>
       </div>
@@ -628,7 +628,7 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelPlusIRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md shadow-xs border border-indigo-200">
+        <span className="font-mono text-[11px] font-semibold text-[#11151C] bg-white px-2 py-0.5 rounded border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C]">
           |+i⟩
         </span>
       </div>
@@ -637,36 +637,36 @@ export default function BlochSphere3D({ ideal, noisy, coherenceRadius }: Props) 
         ref={labelMinusIRef}
         className="absolute top-0 left-0 pointer-events-none transition-opacity duration-150"
       >
-        <span className="font-mono text-xs font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md shadow-xs border border-slate-200">
+        <span className="font-mono text-[11px] font-semibold text-[#11151C] bg-[#FAF7F0] px-2 py-0.5 rounded border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C]">
           |−i⟩
         </span>
       </div>
 
       {/* Floating Toolbar: Start/Pause Rotation & Reset View */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 pointer-events-auto z-10">
+      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2 pointer-events-auto z-10">
         <button
           type="button"
           onClick={() => setAutoRotate((prev) => !prev)}
-          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border shadow-xs transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
             autoRotate
-              ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-[#D4F74A] text-[#11151C] hover:bg-[#C6EA3B]'
+              : 'bg-white text-[#11151C] hover:bg-[#F3EFE6]'
           }`}
         >
           {autoRotate ? (
-            <Pause size={13} className="text-amber-600" />
+            <Pause size={11} className="text-[#11151C]" />
           ) : (
-            <Play size={13} className="text-blue-600" />
+            <Play size={11} className="text-blue-600" />
           )}
-          <span>{autoRotate ? 'Pause Rotation' : 'Auto-Rotate'}</span>
+          <span>{autoRotate ? 'Pause Orbit' : 'Auto-Orbit'}</span>
         </button>
 
         <button
           type="button"
           onClick={resetRotation}
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs transition-all cursor-pointer"
+          className="flex items-center gap-1.5 text-[11px] font-semibold text-[#11151C] bg-white hover:bg-[#F3EFE6] px-2.5 py-1 rounded-md border border-[#11151C] shadow-[1.5px_1.5px_0px_#11151C] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
         >
-          <RotateCcw size={13} className="text-slate-500" />
+          <RotateCcw size={11} className="text-[#11151C]" />
           <span>Reset View</span>
         </button>
       </div>
